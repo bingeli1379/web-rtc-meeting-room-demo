@@ -1,6 +1,8 @@
 const express = require('express')
 const app = express()
 const expressWs = require('express-ws')(app)
+app.use(express.static(__dirname + '/public'))
+app.use('/images', express.static(__dirname + '/images'))
 app.use(express.static(__dirname + '/views'))
 
 let websocketList = []
@@ -50,6 +52,10 @@ app.ws('/connection', ws => {
       }))
     })
   })
+})
+
+app.use((req, res, next) => {
+  res.redirect(301, '/')
 })
 
 app.listen(3000)
