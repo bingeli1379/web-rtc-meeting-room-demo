@@ -123,22 +123,42 @@
         const toggleStatusScreen = () => { isShareScreen.value = !isShareScreen.value }
 
         const userData = reactive({
+          id: '',
           name: '',
+          websocket: null,
           cameraStream: null,
           screenStream: null,
         })
         const memberList = ref([])
 
         const init = () => {
-          console.log(123)
+          if (userData.websocket) return
+          userData.websocket = new WebSocket('ws://localhost:3000/connection')
+
+          userData.websocket.addEventListener('message', async e => {
+            const data = JSON.parse(e.data)
+            const sender = memberList.find(user => user.id === data.sender)
+
+            if (data.event === 'close') {
+              memberList = memberList.filter(user => user !== sender)
+              sender.peer.close()
+            }
+          })
+
+          userData.websocket.addEventListener('close', () => {
+            userData.id = ''
+            userData.websocket = null
+            memberList.value = []
+            init()
+          })
         }
 
-        // onMounted(() => {
-        //   const nameModal = document.querySelector('#name-modal')
-        //   const bsNameModal = new bootstrap.Modal(nameModal)
-        //   bsNameModal.show()
-        //   nameModal.addEventListener('hidden.bs.modal', init)
-        // })
+        onMounted(() => {
+          const nameModal = document.querySelector('#name-modal')
+          const bsNameModal = new bootstrap.Modal(nameModal)
+          bsNameModal.show()
+          nameModal.addEventListener('hidden.bs.modal', init)
+        })
 
         return {
           isShareMic,
