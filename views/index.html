@@ -13,10 +13,49 @@
   <meta name="theme-color" content="#ffffff">
   <title>Meetting room</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-F3w7mX95PdgyTmZZMECAngseQB83DfGTowi0iMjiWaeVhAn4FJkqJByhZMI3AhiU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
   <style>
-    body {
+    .wrap {
       height: 100vh;
-      /* background-color: #333; */
+      background-color: #333;
+      color: #fff;
+    }
+    .content {
+      scrollbar-width: thin;
+    }
+    .content::-webkit-scrollbar {
+      width: 0.5rem;
+      background-color: rgba(255, 255, 255, 0.3);
+    }
+    .content::-webkit-scrollbar-thumb {
+      width: 0.5rem;
+      background-color: rgba(255, 255, 255, 0.5);
+      border-radius: 0.5rem;
+    }
+    .content::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(255, 255, 255, 0.6);
+    }
+    .action-btn {
+      font-size: 1.25rem;
+      width: 2.5rem;
+      height: 2.5rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 50%;
+      color: #fff;
+      background-color: #111;
+      transition: all 0.1s;
+    }
+    .action-btn:hover {
+      color: #fff;
+      background-color: #555;
+    }
+    .action-btn.close {
+      background-color: #ea4335;
+    }
+    .action-btn.open {
+      background-color: #8ab4f8;
     }
   </style>
 </head>
@@ -27,20 +66,95 @@
   <script src="https://unpkg.com/vue@next"></script>
 
   <script type="text/x-template" id="app-template">
-    {{ counter }}
+    <div class="wrap d-flex flex-column pt-2">
+      <div class="content flex-grow-1 overflow-auto">
+        <div class="container-fluid">
+          <div class="row g-3">
+            <div class="col-sm-6 col-md-4 col-lg-3 col-xl-2" v-for="user in memberList" :key="user.id">
+              111
+            </div>
+          </div> 
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-center px-5 pt-3 pb-3">
+        <a href="#" class="action-btn mx-2" :class="{ 'close': !isShareMic }" @click.prevent="toggleStatusMic">
+          <i v-if="isShareMic" class="bi bi-mic"></i>
+          <i v-else class="bi bi-mic-mute"></i>
+        </a>
+        <a href="#" class="action-btn mx-2" :class="{ 'close': !isShareCamera }" @click.prevent="toggleStatusCamera">
+          <i v-if="isShareCamera" class="bi bi-camera-video"></i>
+          <i v-else class="bi bi-camera-video-off"></i>
+        </a>
+        <a href="#" class="action-btn mx-2" :class="{ 'open': isShareScreen }" @click.prevent="toggleStatusScreen">
+          <i class="bi bi-display"></i>
+        </a>
+      </div>
+    </div>
+
+    <div class="modal fade" id="name-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content vh-50">
+          <div class="modal-body">
+            <h1 class="h3 text-center mb-3">歡迎加入～～</h1>
+            <input v-model="userData.name" class="form-control mb-3" type="text" placeholder="你的名字是？">
+            <div class="text-end">
+              <button type="button" class="btn btn-primary" data-bs-dismiss="modal">加入</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </script>
 
-  <script>
+  <script type="module">
+    const { createApp, ref, reactive, toRef, toRefs, onMounted } = Vue
+
     const App = {
       template: '#app-template',
-      data() {
+      setup() {
+        const isShareMic = ref(false)
+        const toggleStatusMic = () => { isShareMic.value = !isShareMic.value }
+
+        const isShareCamera = ref(false)
+        const toggleStatusCamera = () => { isShareCamera.value = !isShareCamera.value }
+
+        const isShareScreen = ref(false)
+        const toggleStatusScreen = () => { isShareScreen.value = !isShareScreen.value }
+
+        const userData = reactive({
+          name: '',
+          cameraStream: null,
+          screenStream: null,
+        })
+        const memberList = ref([])
+
+        const init = () => {
+          console.log(123)
+        }
+
+        // onMounted(() => {
+        //   const nameModal = document.querySelector('#name-modal')
+        //   const bsNameModal = new bootstrap.Modal(nameModal)
+        //   bsNameModal.show()
+        //   nameModal.addEventListener('hidden.bs.modal', init)
+        // })
+
         return {
-          counter: 0
+          isShareMic,
+          toggleStatusMic,
+          isShareCamera,
+          toggleStatusCamera,
+          isShareScreen,
+          toggleStatusScreen,
+
+          userData,
+          memberList
         }
       }
     }
 
-  Vue.createApp(App).mount('#app')
+  createApp(App).mount('#app')
   </script>
 </body>
 </html>
