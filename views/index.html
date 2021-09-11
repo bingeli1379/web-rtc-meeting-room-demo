@@ -13,10 +13,34 @@
   <meta name="theme-color" content="#ffffff">
   <title>Meetting room</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-F3w7mX95PdgyTmZZMECAngseQB83DfGTowi0iMjiWaeVhAn4FJkqJByhZMI3AhiU" crossorigin="anonymous">
+  <style>
+    body {
+      height: 100vh;
+      /* background-color: #333; */
+    }
+  </style>
 </head>
 <body>
-  <h1>QQ</h1>
+  <div id="app"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-/bQdsTh/da6pkI1MST/rWKFNjaCP5gBSY4sEBT38Q/9RBh9AH40zEOg7Hlq2THRZ" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/vue@next"></script>
+
+  <script type="text/x-template" id="app-template">
+    {{ counter }}
+  </script>
+
+  <script>
+    const App = {
+      template: '#app-template',
+      data() {
+        return {
+          counter: 0
+        }
+      }
+    }
+
+  Vue.createApp(App).mount('#app')
+  </script>
 </body>
 </html>
