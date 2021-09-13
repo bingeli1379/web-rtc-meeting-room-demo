@@ -12,32 +12,34 @@ app.ws('/connection', ws => {
   ws.send(JSON.stringify({
     event: 'init',
     id,
-    userList: websocketList.map(item => item.id)
+    memberList: websocketList.map(item => item.id)
   }))
   websocketList.push(ws)
 
   ws.on('message', msg => {
     const data = JSON.parse(msg)
 
-    const taker = websocketList.find(item => item.id === data.taker)
+    const taker = websocketList.find(item => item.id === data.takerId)
     if (data.event === 'request') {
       taker.send(JSON.stringify({
         event: 'request',
-        sender: data.sender,
+        senderId: data.senderId,
+        name: data.name,
         connection: data.connection
       }))
     }
     if (data.event === 'response') {
       taker.send(JSON.stringify({
         event: 'response',
-        sender: data.sender,
+        senderId: data.senderId,
+        name: data.name,
         connection: data.connection
       }))
     }
     if (data.event === 'candidate') {
       taker.send(JSON.stringify({
         event: 'candidate',
-        sender: data.sender,
+        senderId: data.senderId,
         candidate: data.candidate
       }))
     }
@@ -48,7 +50,7 @@ app.ws('/connection', ws => {
     websocketList.forEach(client => {
       client.send(JSON.stringify({
         event: 'close',
-        sender: ws.id
+        senderId: ws.id
       }))
     })
   })
