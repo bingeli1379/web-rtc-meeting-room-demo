@@ -137,7 +137,7 @@
 
           userData.websocket.addEventListener('message', async e => {
             const data = JSON.parse(e.data)
-            const sender = memberList.find(user => user.id === data.sender)
+            const sender = memberList.find(user => user.id === data.senderId)
 
             if (data.event === 'close') {
               memberList = memberList.filter(user => user !== sender)
@@ -148,7 +148,6 @@
           userData.websocket.addEventListener('close', () => {
             userData.id = ''
             userData.websocket = null
-            memberList.value = []
             init()
           })
         }
