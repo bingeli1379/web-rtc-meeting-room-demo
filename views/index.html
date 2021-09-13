@@ -15,6 +15,11 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-F3w7mX95PdgyTmZZMECAngseQB83DfGTowi0iMjiWaeVhAn4FJkqJByhZMI3AhiU" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
   <style>
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
     .wrap {
       height: 100vh;
       background-color: #333;
@@ -34,6 +39,25 @@
     }
     .content::-webkit-scrollbar-thumb:hover {
       background-color: rgba(255, 255, 255, 0.6);
+    }
+    .content-member {
+      height: 17rem;
+    }
+    .content-member i {
+      font-size: 5rem;
+    }
+    .content-name {
+      position: absolute;
+      top: 0;
+      right: 0.5rem;
+      max-width: 8rem;
+    }
+    .content-stream-secondary {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 40%;
+      height: 40%;
     }
     .action-btn {
       font-size: 1.25rem;
@@ -68,25 +92,43 @@
   <script type="text/x-template" id="app-template">
     <div class="wrap d-flex flex-column pt-2">
       <div class="content flex-grow-1 overflow-auto">
-        <div class="container-fluid">
+        <div v-if="userData.id" class="container-fluid">
           <div class="row g-3">
-            <div class="col-sm-6 col-md-4 col-lg-3 col-xl-2" v-for="user in memberList" :key="user.id">
-              111
+            <div class="col-sm-6 col-md-4 col-lg-3">
+              <div class="content-member d-flex justify-content-center align-items-center position-relative overflow-hidden rounded">
+                <span class="content-name text-truncate">{{ userData.name }}</span>
+                <i class="bi bi-person-circle" v-if="!userData.cameraStream && !userData.screenStream"></i>
+                <template v-else>
+                  <video class="rounded" :class="{ 'content-stream-secondary': userData.screenStream }" :srcObject="userData.cameraStream" autoplay muted></video>
+                  <video v-show="userData.screenStream" class="rounded" :srcObject="userData.screenStream" autoplay muted></video>
+                </template>
+              </div>
+            </div>
+
+            <div class="col-sm-6 col-md-4 col-lg-3" v-for="member in memberList" :key="member.id">
+              <div class="content-member d-flex justify-content-center align-items-center position-relative overflow-hidden rounded">
+                <span class="content-name text-truncate">{{ member.name }}</span>
+                <i class="bi bi-person-circle" v-if="!member.camera.stream && !member.screen.stream"></i>
+                <template v-else>
+                  <video class="rounded" :class="{ 'content-stream-secondary': member.screen.stream }" :srcObject="member.camera.stream" autoplay muted></video>
+                  <video v-show="member.screen.stream" class="rounded" :srcObject="member.screen.stream" autoplay muted></video>
+                </template>
+              </div>
             </div>
           </div> 
         </div>
       </div>
 
       <div class="d-flex justify-content-center px-5 pt-3 pb-3">
-        <a href="#" class="action-btn mx-2" :class="{ 'close': !isShareMic }" @click.prevent="toggleStatusMic">
+        <a href="#" class="action-btn mx-2" :class="{ 'close': !isShareMic }" :disabled="isLoading" @click.prevent="toggleStatusMic">
           <i v-if="isShareMic" class="bi bi-mic"></i>
           <i v-else class="bi bi-mic-mute"></i>
         </a>
-        <a href="#" class="action-btn mx-2" :class="{ 'close': !isShareCamera }" @click.prevent="toggleStatusCamera">
+        <a href="#" class="action-btn mx-2" :class="{ 'close': !isShareCamera }" :disabled="isLoading" @click.prevent="toggleStatusCamera">
           <i v-if="isShareCamera" class="bi bi-camera-video"></i>
           <i v-else class="bi bi-camera-video-off"></i>
         </a>
-        <a href="#" class="action-btn mx-2" :class="{ 'open': isShareScreen }" @click.prevent="toggleStatusScreen">
+        <a href="#" class="action-btn mx-2" :class="{ 'open': isShareScreen }" :disabled="isLoading" @click.prevent="toggleStatusScreen">
           <i class="bi bi-display"></i>
         </a>
       </div>
@@ -113,6 +155,8 @@
     const App = {
       template: '#app-template',
       setup() {
+        const isLoading = ref(false)
+
         const isShareMic = ref(false)
         const toggleStatusMic = () => { isShareMic.value = !isShareMic.value }
 
@@ -130,6 +174,7 @@
           screenStream: null,
         })
         const memberList = ref([])
+        const offerOptions = { offerToReceiveAudio: true,  offerToReceiveVideo: true }
 
         const init = () => {
           if (userData.websocket) return
@@ -137,7 +182,111 @@
 
           userData.websocket.addEventListener('message', async e => {
             const data = JSON.parse(e.data)
-            const sender = memberList.find(user => user.id === data.senderId)
+            const sender = memberList.value.find(user => user.id === data.senderId)
+
+            if (data.event === 'init') {
+              userData.id = data.id
+              memberList.value = data.memberList.map(id => {
+                return {
+                  id,
+                  peer: null,
+                  name: '',
+                  camera: {
+                    id: '',
+                    stream: null
+                  },
+                  screen: {
+                    id: '',
+                    stream: null
+                  } 
+                }
+              })
+              memberList.value.forEach(async member => {
+                member.peer = createPeer(member.id)
+                const mediaStreamData = {}
+                if (userData.cameraStream) {
+                  userData.cameraStream.getTracks().forEach(track => {
+                    peer.addTrack(track, cameraStream)
+                  })
+                  mediaStreamData.cameraId = userData.cameraStream.id
+                }
+                if (userData.screenStream) {
+                  userData.screenStream.getTracks().forEach(track => {
+                    peer.addTrack(track, screenStream)
+                  })
+                  mediaStreamData.screenId = userData.screenStream.id
+                }
+                const offer = await member.peer.createOffer(offerOptions)
+                offer.mediaStreamData = mediaStreamData
+                await member.peer.setLocalDescription(offer)
+                ws.send(JSON.stringify({
+                  event: 'request',
+                  senderId: userData.id,
+                  takerId: member.id,
+                  connection: offer
+                }))
+              })
+            }
+
+            if (data.event === 'request') {
+              if (!sender) {
+                const member = {
+                  id: data.senderId,
+                  peer: createPeer(data.senderId),
+                  name: '',
+                  camera: {
+                    id: '',
+                    stream
+                  },
+                  screen: {
+                    id: '',
+                    stream
+                  } 
+                }
+                memberList.value.push(member)
+                const mediaStreamData = {}
+                if (userData.cameraStream) {
+                  userData.cameraStream.getTracks().forEach(track => {
+                    peer.addTrack(track, cameraStream)
+                  })
+                  mediaStreamData.cameraId = userData.cameraStream.id
+                }
+                if (userData.screenStream) {
+                  userData.screenStream.getTracks().forEach(track => {
+                    peer.addTrack(track, screenStream)
+                  })
+                  mediaStreamData.screenId = userData.screenStream.id
+                }
+                await member.peer.setRemoteDescription(data.connection)
+                const answer = await member.peer.createAnswer(offerOptions)
+                answer.mediaStreamData = mediaStreamData
+                await member.peer.setLocalDescription(answer)
+                ws.send(JSON.stringify({
+                  event: 'response',
+                  senderId: userData.id,
+                  takerId: member.id,
+                  connection: answer
+                }))
+              } else {
+                await sender.peer.setRemoteDescription(data.connection)
+                const answer = await sender.peer.createAnswer(offerOptions)
+                const mediaStreamData = {}
+                if (userData.cameraStream) {
+                  mediaStreamData.cameraId = userData.cameraStream.id
+                }
+                if (userData.screenStream) {
+                  mediaStreamData.screenId = userData.screenStream.id
+                }
+                answer.mediaStreamData = mediaStreamData
+                await sender.peer.setLocalDescription(answer)
+                ws.send(JSON.stringify({
+                  event: 'response',
+                  senderId: userData.id,
+                  takerId: sender.id,
+                  connection: answer
+                }))
+              }
+            }
 
             if (data.event === 'response') {
               sender.peer.setRemoteDescription(data.connection)
@@ -148,7 +297,7 @@
             }
 
             if (data.event === 'close') {
-              memberList = memberList.filter(user => user !== sender)
+              memberList.value = memberList.value.filter(user => user !== sender)
               sender.peer.close()
             }
           })
@@ -167,7 +316,42 @@
           nameModal.addEventListener('hidden.bs.modal', init)
         })
 
+        const createPeer = senderId => {
+          const peer = new RTCPeerConnection()
+          peer.addEventListener('icecandidate', e => {
+            if (!e.candidate.candidate) return
+            ws.send(JSON.stringify({
+              event: 'candidate',
+              senderId,
+              takerId: userData.id,
+              candidate: e.candidate 
+            }))
+          })
+          peer.addEventListener('track', e => {
+            console.log('track')
+            console.log(e)
+          })
+          peer.addEventListener('removestream', e => {
+            console.log('removestream')
+          })
+          peer.addEventListener('negotiationneeded', async e => {
+            if (peer.connectionState !== 'connected') return
+            console.log('negotiationneeded')
+            // const offer = await user.peer.createOffer(offerOptions)
+            // await user.peer.setLocalDescription(offer)
+            // ws.send(JSON.stringify({
+            //   event: 'request',
+            //   sender: myId,
+            //   taker: user.id,
+            //   connection: offer
+            // }))
+          })
+          return peer
+        }
+
         return {
+          isLoading,
+
           isShareMic,
           toggleStatusMic,
           isShareCamera,
