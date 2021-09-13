@@ -139,6 +139,14 @@
             const data = JSON.parse(e.data)
             const sender = memberList.find(user => user.id === data.senderId)
 
+            if (data.event === 'response') {
+              sender.peer.setRemoteDescription(data.connection)
+            }
+
+            if (data.event === 'candidate') {
+              sender.peer.addIceCandidate(data.candidate)
+            }
+
             if (data.event === 'close') {
               memberList = memberList.filter(user => user !== sender)
               sender.peer.close()
