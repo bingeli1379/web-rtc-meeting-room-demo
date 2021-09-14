@@ -53,6 +53,7 @@
       max-width: 8rem;
     }
     .content-stream-secondary {
+      transition: all 0.2s;
       position: absolute;
       right: 0;
       bottom: 0;
@@ -108,10 +109,10 @@
             <div class="col-sm-6 col-md-4 col-lg-3" v-for="member in memberList" :key="member.id">
               <div class="content-member d-flex justify-content-center align-items-center position-relative overflow-hidden rounded">
                 <span class="content-name text-truncate">{{ member.name }}</span>
-                <i class="bi bi-person-circle" v-if="!member.camera.stream && !member.screen.stream"></i>
+                <i class="bi bi-person-circle" v-if="!member.cameraStream && !member.screenStream"></i>
                 <template v-else>
-                  <video class="rounded" :class="{ 'content-stream-secondary': member.screen.stream }" :srcObject="member.camera.stream" autoplay muted></video>
-                  <video v-show="member.screen.stream" class="rounded" :srcObject="member.screen.stream" autoplay muted></video>
+                  <video class="rounded" :class="{ 'content-stream-secondary': member.screenStream }" :srcObject="member.cameraStream" autoplay muted></video>
+                  <video v-show="member.screenStream" class="rounded" :srcObject="member.screenStream" autoplay muted></video>
                 </template>
               </div>
             </div>
@@ -157,15 +158,6 @@
       setup() {
         const isLoading = ref(false)
 
-        const isShareMic = ref(false)
-        const toggleStatusMic = () => { isShareMic.value = !isShareMic.value }
-
-        const isShareCamera = ref(false)
-        const toggleStatusCamera = () => { isShareCamera.value = !isShareCamera.value }
-
-        const isShareScreen = ref(false)
-        const toggleStatusScreen = () => { isShareScreen.value = !isShareScreen.value }
-
         const userData = reactive({
           id: '',
           name: '',
@@ -175,6 +167,81 @@
         })
         const memberList = ref([])
         const offerOptions = { offerToReceiveAudio: true,  offerToReceiveVideo: true }
+
+        const isShareMic = ref(false)
+        const toggleStatusMic = () => {
+          isShareMic.value = !isShareMic.value
+          if (!userData.cameraStream) return
+          userData.cameraStream.getAudioTracks().forEach(track => {
+            track.enabled = isShareMic.value
+          })
+        }
+
+        const isShareCamera = ref(false)
+        const toggleStatusCamera = () => {
+          if (isShareCamera.value) {
+            const removeTrackId = userData.cameraStream.getTracks().map(track => track.id)
+            memberList.value.forEach(member => {
+              if (!member.peer) return
+              member.peer.getSenders().forEach(sender => {
+                if (removeTrackId.indexOf(sender.track?.id) === -1) return
+                member.peer.removeTrack(sender)
+              })
+            })
+            userData.cameraStream.getTracks().forEach(track => {
+              track.stop()
+            })
+            userData.cameraStream = null
+            isShareCamera.value = false
+          } else {
+            isLoading.value = true
+            const constraints = { audio: true, video: true }
+            navigator.mediaDevices.getUserMedia(constraints).then(stream => {
+              isShareCamera.value = true
+              userData.cameraStream = stream
+              memberList.value.forEach(member => {
+                if (!member.peer) return
+                stream.getTracks().forEach(track => {
+                  member.peer.addTrack(track, stream)
+                })
+              })
+              isLoading.value = false
+            })
+          }
+        }
+
+        const isShareScreen = ref(false)
+        const toggleStatusScreen = () => {
+          if (isShareScreen.value) {
+            const removeTrackId = userData.screenStream.getTracks().map(track => track.id)
+            memberList.value.forEach(member => {
+              if (!member.peer) return
+              member.peer.getSenders().forEach(sender => {
+                if (removeTrackId.indexOf(sender.track?.id) === -1) return
+                member.peer.removeTrack(sender)
+              })
+            })
+            userData.screenStream.getTracks().forEach(track => {
+              track.stop()
+            })
+            userData.screenStream = null
+            isShareScreen.value = false
+          } else {
+            isLoading.value = true
+            const constraints = { audio: false, video: true }
+            navigator.mediaDevices.getDisplayMedia(constraints).then(stream => {
+              isShareScreen.value = true
+              userData.screenStream = stream
+              memberList.value.forEach(member => {
+                if (!member.peer) return
+                stream.getTracks().forEach(track => {
+                  member.peer.addTrack(track, stream)
+                })
+              })
+              isLoading.value = false
+            })
+          }
+        }
 
         const init = () => {
           if (userData.websocket) return
@@ -191,39 +258,37 @@
                   id,
                   peer: null,
                   name: '',
-                  camera: {
-                    id: '',
-                    stream: null
-                  },
-                  screen: {
-                    id: '',
-                    stream: null
-                  } 
+                  cameraStream: null,
+                  screenStream: null,
+                  mediaStreamMetaData: null
                 }
               })
               memberList.value.forEach(async member => {
                 member.peer = createPeer(member.id)
-                const mediaStreamData = {}
+
+                const mediaStreamMetaData = {}
                 if (userData.cameraStream) {
                   userData.cameraStream.getTracks().forEach(track => {
                     peer.addTrack(track, cameraStream)
                   })
-                  mediaStreamData.cameraId = userData.cameraStream.id
+                  mediaStreamMetaData[userData.cameraStream.id] = 'cameraStream'
                 }
                 if (userData.screenStream) {
                   userData.screenStream.getTracks().forEach(track => {
                     peer.addTrack(track, screenStream)
                   })
-                  mediaStreamData.screenId = userData.screenStream.id
+                  mediaStreamMetaData[userData.screenStream.id] = 'screenStream'
                 }
+
                 const offer = await member.peer.createOffer(offerOptions)
-                offer.mediaStreamData = mediaStreamData
                 await member.peer.setLocalDescription(offer)
-                ws.send(JSON.stringify({
+                userData.websocket.send(JSON.stringify({
                   event: 'request',
                   senderId: userData.id,
                   takerId: member.id,
-                  connection: offer
+                  name: userData.name,
+                  connection: offer,
+                  mediaStreamMetaData
                 }))
               })
             }
@@ -233,62 +298,67 @@
                 const member = {
                   id: data.senderId,
                   peer: createPeer(data.senderId),
-                  name: '',
-                  camera: {
-                    id: '',
-                    stream
-                  },
-                  screen: {
-                    id: '',
-                    stream
-                  } 
+                  name: data.name,
+                  cameraStream: null,
+                  screenStream: null,
+                  mediaStreamMetaData: data.mediaStreamMetaData
                 }
                 memberList.value.push(member)
-                const mediaStreamData = {}
+
+                const mediaStreamMetaData = {}
                 if (userData.cameraStream) {
                   userData.cameraStream.getTracks().forEach(track => {
-                    peer.addTrack(track, cameraStream)
+                    member.peer.addTrack(track, userData.cameraStream)
                   })
-                  mediaStreamData.cameraId = userData.cameraStream.id
+                  mediaStreamMetaData[userData.cameraStream.id] = 'cameraStream'
                 }
                 if (userData.screenStream) {
                   userData.screenStream.getTracks().forEach(track => {
-                    peer.addTrack(track, screenStream)
+                    member.peer.addTrack(track, userData.screenStream)
                   })
-                  mediaStreamData.screenId = userData.screenStream.id
+                  mediaStreamMetaData[userData.screenStream.id] = 'screenStream'
                 }
+
                 await member.peer.setRemoteDescription(data.connection)
                 const answer = await member.peer.createAnswer(offerOptions)
-                answer.mediaStreamData = mediaStreamData
                 await member.peer.setLocalDescription(answer)
-                ws.send(JSON.stringify({
+                userData.websocket.send(JSON.stringify({
                   event: 'response',
                   senderId: userData.id,
                   takerId: member.id,
-                  connection: answer
+                  name: userData.name,
+                  connection: answer,
+                  mediaStreamMetaData
                 }))
               } else {
-                await sender.peer.setRemoteDescription(data.connection)
-                const answer = await sender.peer.createAnswer(offerOptions)
-                const mediaStreamData = {}
+                sender.name = data.name
+                sender.mediaStreamMetaData = data.mediaStreamMetaData
+
+                const mediaStreamMetaData = {}
                 if (userData.cameraStream) {
-                  mediaStreamData.cameraId = userData.cameraStream.id
+                  mediaStreamMetaData[userData.cameraStream.id] = 'cameraStream'
                 }
                 if (userData.screenStream) {
-                  mediaStreamData.screenId = userData.screenStream.id
+                  mediaStreamMetaData[userData.screenStream.id] = 'screenStream'
                 }
-                answer.mediaStreamData = mediaStreamData
+
+                await sender.peer.setRemoteDescription(data.connection)
+                const answer = await sender.peer.createAnswer(offerOptions)
                 await sender.peer.setLocalDescription(answer)
-                ws.send(JSON.stringify({
+                userData.websocket.send(JSON.stringify({
                   event: 'response',
                   senderId: userData.id,
                   takerId: sender.id,
-                  connection: answer
+                  name: userData.name,
+                  connection: answer,
+                  mediaStreamMetaData
                 }))
               }
             }
 
             if (data.event === 'response') {
+              sender.name = data.name
+              sender.mediaStreamMetaData = data.mediaStreamMetaData
               sender.peer.setRemoteDescription(data.connection)
             }
 
@@ -319,32 +389,50 @@
         const createPeer = senderId => {
           const peer = new RTCPeerConnection()
           peer.addEventListener('icecandidate', e => {
-            if (!e.candidate.candidate) return
-            ws.send(JSON.stringify({
+            if (!e.candidate?.candidate) return
+            userData.websocket.send(JSON.stringify({
               event: 'candidate',
-              senderId,
-              takerId: userData.id,
+              senderId: userData.id,
+              takerId: senderId,
               candidate: e.candidate 
             }))
           })
           peer.addEventListener('track', e => {
-            console.log('track')
-            console.log(e)
+            const member = memberList.value.find(member => member.id === senderId)
+            Object.keys(member.mediaStreamMetaData).forEach(id => {
+              const stream = e.streams[0]
+              if (stream.id !== id) return
+              const type = member.mediaStreamMetaData[id]
+              member[type] = stream
+            })
           })
           peer.addEventListener('removestream', e => {
-            console.log('removestream')
+            const member = memberList.value.find(member => member.id === senderId)
+            const removeId = e.stream.id
+            if (member.cameraStream?.id === removeId) member.cameraStream = null
+            if (member.screenStream?.id === removeId) member.screenStream = null
           })
           peer.addEventListener('negotiationneeded', async e => {
             if (peer.connectionState !== 'connected') return
-            console.log('negotiationneeded')
-            // const offer = await user.peer.createOffer(offerOptions)
-            // await user.peer.setLocalDescription(offer)
-            // ws.send(JSON.stringify({
-            //   event: 'request',
-            //   sender: myId,
-            //   taker: user.id,
-            //   connection: offer
-            // }))
+
+            const mediaStreamMetaData = {}
+            if (userData.cameraStream) {
+              mediaStreamMetaData[userData.cameraStream.id] = 'cameraStream'
+            }
+            if (userData.screenStream) {
+              mediaStreamMetaData[userData.screenStream.id] = 'screenStream'
+            }
+
+            const member = memberList.value.find(member => member.id === senderId)
+            const offer = await member.peer.createOffer(offerOptions)
+            await member.peer.setLocalDescription(offer)
+            userData.websocket.send(JSON.stringify({
+              event: 'request',
+              senderId: userData.id,
+              takerId: senderId,
+              connection: offer,
+              mediaStreamMetaData
+            }))
           })
           return peer
         }
@@ -352,15 +440,15 @@
         return {
           isLoading,
 
+          userData,
+          memberList,
+
           isShareMic,
           toggleStatusMic,
           isShareCamera,
           toggleStatusCamera,
           isShareScreen,
           toggleStatusScreen,
-
-          userData,
-          memberList
         }
       }
     }

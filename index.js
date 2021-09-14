@@ -25,7 +25,8 @@ app.ws('/connection', ws => {
         event: 'request',
         senderId: data.senderId,
         name: data.name,
-        connection: data.connection
+        connection: data.connection,
+        mediaStreamMetaData: data.mediaStreamMetaData
       }))
     }
     if (data.event === 'response') {
@@ -33,7 +34,8 @@ app.ws('/connection', ws => {
         event: 'response',
         senderId: data.senderId,
         name: data.name,
-        connection: data.connection
+        connection: data.connection,
+        mediaStreamMetaData: data.mediaStreamMetaData
       }))
     }
     if (data.event === 'candidate') {
