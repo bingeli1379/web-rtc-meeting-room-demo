@@ -245,7 +245,7 @@
 
         const init = () => {
           if (userData.websocket) return
-          userData.websocket = new WebSocket('ws://localhost:3000/connection')
+          userData.websocket = new WebSocket('wss://meeting-room-eli.herokuapp.com/connection')
 
           userData.websocket.addEventListener('message', async e => {
             const data = JSON.parse(e.data)
