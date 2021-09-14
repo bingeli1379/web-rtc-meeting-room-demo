@@ -255,6 +255,7 @@
               userData.id = data.id
               memberList.value = data.memberList.map(id => {
                 return {
+                  isInit: false,
                   id,
                   peer: null,
                   name: '',
@@ -269,14 +270,11 @@
                 const mediaStreamMetaData = {}
                 if (userData.cameraStream) {
                   userData.cameraStream.getTracks().forEach(track => {
-                    peer.addTrack(track, cameraStream)
+                    peer.addTrack(track, userData.cameraStream)
                   })
                   mediaStreamMetaData[userData.cameraStream.id] = 'cameraStream'
                 }
                 if (userData.screenStream) {
-                  userData.screenStream.getTracks().forEach(track => {
-                    peer.addTrack(track, screenStream)
-                  })
                   mediaStreamMetaData[userData.screenStream.id] = 'screenStream'
                 }
 
@@ -296,6 +294,7 @@
             if (data.event === 'request') {
               if (!sender) {
                 const member = {
+                  isInit: false,
                   id: data.senderId,
                   peer: createPeer(data.senderId),
                   name: data.name,
@@ -313,9 +312,6 @@
                   mediaStreamMetaData[userData.cameraStream.id] = 'cameraStream'
                 }
                 if (userData.screenStream) {
-                  userData.screenStream.getTracks().forEach(track => {
-                    member.peer.addTrack(track, userData.screenStream)
-                  })
                   mediaStreamMetaData[userData.screenStream.id] = 'screenStream'
                 }
 
@@ -411,6 +407,14 @@
             const removeId = e.stream.id
             if (member.cameraStream?.id === removeId) member.cameraStream = null
             if (member.screenStream?.id === removeId) member.screenStream = null
+          })
+          peer.addEventListener('connectionstatechange', e => {
+            const member = memberList.value.find(member => member.id === senderId)
+            if (member.isInit || peer.connectionState !== 'connected' || !userData.screenStream) return
+            member.isInit = true
+            userData.screenStream.getTracks().forEach(track => {
+              peer.addTrack(track, userData.screenStream)
+            })
           })
           peer.addEventListener('negotiationneeded', async e => {
             if (peer.connectionState !== 'connected') return
