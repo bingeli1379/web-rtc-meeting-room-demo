@@ -270,7 +270,7 @@
                 const mediaStreamMetaData = {}
                 if (userData.cameraStream) {
                   userData.cameraStream.getTracks().forEach(track => {
-                    peer.addTrack(track, userData.cameraStream)
+                    member.peer.addTrack(track, userData.cameraStream)
                   })
                   mediaStreamMetaData[userData.cameraStream.id] = 'cameraStream'
                 }
@@ -410,14 +410,14 @@
           })
           peer.addEventListener('connectionstatechange', e => {
             const member = memberList.value.find(member => member.id === senderId)
-            if (member.isInit || peer.connectionState !== 'connected' || !userData.screenStream) return
+            if (member.isInit || peer.iceConnectionState !== 'connected' || !userData.screenStream) return
             member.isInit = true
             userData.screenStream.getTracks().forEach(track => {
               peer.addTrack(track, userData.screenStream)
             })
           })
           peer.addEventListener('negotiationneeded', async e => {
-            if (peer.connectionState !== 'connected') return
+            if (peer.iceConnectionState !== 'connected') return
 
             const mediaStreamMetaData = {}
             if (userData.cameraStream) {
